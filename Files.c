@@ -10,6 +10,9 @@ List *listdir(char *root_dir)
     *L = NULL;
     Cell *temp_cell;
     dp = opendir(root_dir);
+
+    // On parcourt la liste des repertoires et fichiers dans root_dir et
+    // on les ajoute a notre liste
     if (dp != NULL)
     {
         while ((ep = readdir(dp)) != NULL)
@@ -26,7 +29,7 @@ List *listdir(char *root_dir)
     }
     else
     {
-        perror("Could not open the directory");
+        perror("Error: Could not open the directory");
         return NULL;
     }
 
@@ -65,6 +68,8 @@ int file_exists(char *file)
 
 void cp(char *to, char *from)
 {
+    // On recupere le contenu de from (path forme a partir du hash)
+    // puis on le copie dans to
     if (file_exists(from))
     {
         char ligne[256];
@@ -82,12 +87,16 @@ void cp(char *to, char *from)
 
 char *hashToPath(char *hash)
 {
-    char *dir = malloc((strlen(hash) + 1) * sizeof(char));
+    // A partir des deux premiers characteres du hash, on cree un repertoire ou
+    // on enregistrera le fichier contenant le contenu commit / wt / fichier.
+    // Ce fichier sera nomme a partir du reste des characteres du hash
+    int hash_size = strlen(hash);
+    char *dir = malloc((hash_size + 1) * sizeof(char));
     dir[0] = hash[0];
     dir[1] = hash[1];
     dir[2] = *"/";
     int i;
-    for (i = 3; i <= strlen(hash); i++)
+    for (i = 3; i <= hash_size; i++)
     {
         dir[i] = hash[i - 1];
     }
@@ -124,10 +133,11 @@ char *hashToFile(char *hash)
 
 char *concat_paths(char *path1, char *path2)
 {
+    // Ajoute path2 a path1
     char *result = malloc(strlen(path1) + strlen(path2) + 1);
     if (result == NULL)
     {
-        printf("Error: unable to allocate memory\n");
+        printf("Error: Unable to allocate memory\n");
         return NULL;
     }
     strcpy(result, path1); // Copy path1 to result

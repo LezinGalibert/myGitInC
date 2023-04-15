@@ -54,6 +54,8 @@ WorkTree *initWorkTree()
 
 int inWorkTree(WorkTree *wt, char *name)
 {
+    // On parcourt les WF de WT et on cherche celui dont le nom correspond
+    // a name
     for (int i = 0; i < wt->n; i++)
     {
         if (strcmp(wt->tab[i].name, name) == 0)
@@ -64,9 +66,11 @@ int inWorkTree(WorkTree *wt, char *name)
 
 int appendWorkTree(WorkTree *wt, char *name, char *hash, int mode)
 {
+    // Si le fichier n'est pas deja dans le WT, on ajoute le WF correspondant
+    // a la liste tab et on incremente la taille du tableau de 1
     if (inWorkTree(wt, name) >= 0)
     {
-        printf("File <%s> is already in the worktree \n", name);
+        printf("Error: File <%s> is already in the worktree \n", name);
         return -4;
     }
     if (wt->size > wt->n)
@@ -99,25 +103,26 @@ char *wtts(WorkTree *wt)
 
 WorkTree *stwt(char *ch)
 {
-    int pos = 0;
-    int n_pos = 0;
-    int sep = "\n";
+    // Chaque WF etant stocke sous la form name\thash\tmode\n, on recupere chaque ligne en
+    // trouvant l'indice de \n puis on forme un WF a partir du contenu de la ligne
+    int increment = 0;
+    int break_pos = 0;
     char *ptr;
-    char *result = malloc(sizeof(char) * 10000);
+    char *wf_content = malloc(sizeof(char) * 10000);
     WorkTree *wt = initWorkTree();
-    while (pos < strlen(ch))
+    while (increment < strlen(ch))
     {
-        ptr = strchr(ch + pos, sep);
+        ptr = strchr(ch + increment, '\n');
         if (ptr == NULL)
-            n_pos = strlen(ch) + 1;
+            break_pos = strlen(ch) + 1;
         else
         {
-            n_pos = ptr - ch + 1;
+            break_pos = ptr - ch + 1;
         }
-        memcpy(result, ch + pos, n_pos - pos - 1);
-        result[n_pos - pos - 1] = *"\0";
-        pos = n_pos;
-        WorkFile *wf = stwf(result);
+        memcpy(wf_content, ch + increment, break_pos - increment - 1);
+        wf_content[break_pos - increment - 1] = *"\0";
+        increment = break_pos;
+        WorkFile *wf = stwf(wf_content);
         appendWorkTree(wt, wf->name, wf->hash, wf->mode);
     }
     return wt;
@@ -161,8 +166,13 @@ char *blobWorkTree(WorkTree *wt)
 
 char *saveWorkTree(WorkTree *wt, char *path)
 {
+    // On parcourt le WT a sauvegarder, si on trouve un fichier,
+    // on l'enregistre sinon on appelle la fonction recursivement
+    // dans le repertoire
     for (int i = 0; i < wt->n; i++)
     {
+        // Selon les compilateur, ajouter ./ au nom du fichier peut poser
+        // des problemes de lecture du fichier
         char *absPath;
         if (strcmp(path, ".") != 0)
         {
@@ -174,12 +184,14 @@ char *saveWorkTree(WorkTree *wt, char *path)
         }
         if (file_exists(wt->tab[i].name) == 1)
         {
+            // Fichier
             blobFile(absPath);
             wt->tab[i].hash = sha256file(absPath);
             wt->tab[i].mode = getChmod(absPath);
         }
         else
         {
+            // Repertoire
             WorkTree *wt2 = initWorkTree();
             List *L = listdir(absPath);
             for (Cell *ptr = *L; ptr != NULL; ptr = ptr->next)
@@ -210,6 +222,8 @@ int isWorkTree(char *hash)
 
 void restoreWorkTree(WorkTree *wt, char *path)
 {
+    // Meme fonctionnement que saveWorkTree, cette fois on restaure les fichiers et repertoires
+    // a la version correspondant au commit du WT.
     for (int i = 0; i < wt->n; i++)
     {
         char *absPath;
@@ -224,18 +238,20 @@ void restoreWorkTree(WorkTree *wt, char *path)
         char *copyPath = hashToPath(wt->tab[i].hash);
         char *hash = wt->tab[i].hash;
         if (isWorkTree(hash) == 0)
-        { // si c’est un fichier
+        { // Fichier
+            getChmod(absPath);
             cp(absPath, copyPath);
-            setMode(getChmod(copyPath), absPath);
+            // 620: rw pour utilisateur
+            setMode(620, absPath);
         }
         else
         {
             if (isWorkTree(hash) == 1)
-            { // si c’est un repertoire
+            { // Repertoire
                 strcat(copyPath, ".t");
                 WorkTree *nwt = ftwt(copyPath);
                 restoreWorkTree(nwt, absPath);
-                setMode(getChmod(copyPath), absPath);
+                setMode(620, absPath);
             }
         }
     }
@@ -246,16 +262,11 @@ WorkTree *mergeWorkTrees(WorkTree *wt1, WorkTree *wt2, List *conflicts)
     WorkTree *noConflictWT = initWorkTree();
     WorkTree *tmp;
 
-    if (wt1->n < wt2->n)
-    {
-        tmp = wt1;
-        wt1 = wt2;
-        wt2 = tmp;
-    }
-
+    // On cherche les elements de wt1 qui sont aussi dans wt2 et on les ajoute a la liste de conflits.
+    // Le reste est ajoute au WT des elements non en conflit.
     for (int i = 0; i < wt1->n; i++)
     {
-        if (inWorkTree(wt2, wt1->tab[i].name) == 0)
+        if (inWorkTree(wt2, wt1->tab[i].name) != -1)
         {
             Cell *cell = buildCell(wt1->tab[i].name);
             insertFirst(conflicts, cell);
@@ -265,11 +276,15 @@ WorkTree *mergeWorkTrees(WorkTree *wt1, WorkTree *wt2, List *conflicts)
             appendWorkTree(noConflictWT, wt1->tab[i].name, wt1->tab[i].hash, wt1->tab[i].mode);
         }
     }
-    // while (conflicts != NULL)
-    // {
-    //     char *val = (conflicts)->data;
-    //     (conflicts)->next;
-    // }
+
+    // On fait la meme chose pour wt2 en s'assurant de ne pas ajouter le fichier 2 fois.
+    for (int j = 0; j < wt2->n; j++)
+    {
+        if (inWorkTree(wt1, wt2->tab[j].name) == -1)
+        {
+            appendWorkTree(noConflictWT, wt2->tab[j].name, wt2->tab[j].hash, wt2->tab[j].mode);
+        }
+    }
 
     return noConflictWT;
 }

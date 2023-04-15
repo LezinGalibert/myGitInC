@@ -31,6 +31,7 @@ char *sha256file(char *file)
 
 unsigned long hashF(char *str)
 {
+    // Method DJB2
     unsigned long hash = 5381;
     int c;
 

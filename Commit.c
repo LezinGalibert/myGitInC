@@ -60,10 +60,13 @@ Commit *initCommit(int ncommit)
 
 void commitSet(Commit *c, char *key, char *value)
 {
+    // On cherche la position potentielle de key grace a notre fonction de hashing.
     int p = hashF(key) % c->size;
     while (c->T[p] != NULL)
     {
-        p = (p + 1) % c->size; // probing lineaire
+        // Si un element occupe deja cette position, on procede par probing lineaire
+        // en incrementant l'indice de 1 jusqu'a trouver une place libre
+        p = (p + 1) % c->size;
     }
     c->T[p] = createKeyVal(key, value);
     c->n++;
@@ -71,6 +74,7 @@ void commitSet(Commit *c, char *key, char *value)
 
 Commit *createCommit(char *hash)
 {
+    // Genere un commit qui pointera vers le WT represente par hash
     Commit *c = initCommit(Ncommit);
     commitSet(c, "tree", hash);
     return c;
@@ -78,7 +82,10 @@ Commit *createCommit(char *hash)
 
 char *commitGet(Commit *c, char *key)
 {
+    // Recupere la valeur stockee dans le commit correspondant a key
     int p = hashF(key) % c->size;
+
+    // On doit s'arreter lorsque l'on a parcouru tout le tableau
     int attempt = 0;
     while (c->T[p] != NULL && attempt < c->size)
     {
@@ -87,7 +94,7 @@ char *commitGet(Commit *c, char *key)
             char *val = c->T[p]->value;
             return c->T[p]->value;
         }
-        p = (p + 1) % c->size;
+        p = (p + 1) % c->size; // probing lineaire
         attempt = attempt + 1;
     }
     return NULL;
@@ -138,7 +145,7 @@ Commit *ftc(char *file)
     FILE *f = fopen(file, "r");
     if (f == NULL)
     {
-        printf("ERROR: file does not exist\n");
+        printf("ERROR: File does not exist\n");
         return NULL;
     }
     while (fgets(buff, N, f) != NULL)
@@ -160,18 +167,24 @@ void ctf(Commit *c, char *file)
 
 char *blobCommit(Commit *c)
 {
-    char fname[100] = "tmp/myfileXXXXXX";
-    int fd = mkstemp(fname);
-    ctf(c, fname);
-    char *hash = sha256file(fname);
+    // On cree un fichier temporaire dans /tmp, on hash le contenu du commit puis
+    // le store dans le fichier temporaire apres l'avoir renome en suivant la convention
+    char tmp[100] = "tmp/myfileXXXXXX";
+    int _ = mkstemp(tmp);
+    ctf(c, tmp);
+
+    char *hash = sha256file(tmp);
     char *ch = hashToFile(hash);
     strcat(ch, ".c");
-    cp(ch, fname);
+    cp(ch, tmp);
+
     return hash;
 }
 
 char *hashToPathCommit(char *hash)
 {
+    // Scinde le hash en dossier / fichier et rajoute .c pour recuperer
+    // le fichier correspondant au commit hashe
     char *buff = malloc(sizeof(char) * 100);
     sprintf(buff, "%s.c", hashToPath(hash));
     return buff;
@@ -179,6 +192,7 @@ char *hashToPathCommit(char *hash)
 
 void restoreCommit(char *hash_commit)
 {
+    // Recupere le WT correspondant au commit hashe et le restaure dans le dossier courant
     char *commit_path = hashToPathCommit(hash_commit);
     Commit *c = ftc(commit_path);
     char *tree_hash = strcat(hashToPath(commitGet(c, "tree")), ".t");

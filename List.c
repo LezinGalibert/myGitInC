@@ -33,6 +33,8 @@ int listSize(List *L)
     List head = *L;
     int n = 0;
 
+    // On parcourt la liste jusqu'a la fin en incrementant le comteur n
+
     while (head != NULL)
     {
         n = n + 1;
@@ -44,6 +46,7 @@ int listSize(List *L)
 
 void insertFirst(List *L, Cell *C)
 {
+    // On fait pointer la cellule suivante de C vers L puis on renvoie C, la nouvelle tete de liste
     C->next = *L;
     *L = C;
 }
@@ -59,6 +62,8 @@ char *ltos(List *L)
     {
         return " ";
     }
+    // On parcourt la liste (non nulle), jusqu'a la fin et on ajoute chaque element
+    // au string que l'on retourne
     char *ch = malloc(sizeof(char) * MAX_FILES * N);
     List ptr = *L;
     while (ptr != NULL)
@@ -75,6 +80,8 @@ Cell *listGet(List *L, int i)
 {
     Cell *ptr = *L;
     int k = 0;
+
+    // On parcourt la liste et des que l'on trouve l'element correspondant a l'index, on s'arrete
     while (ptr != NULL)
     {
         if (k == i)
@@ -84,13 +91,14 @@ Cell *listGet(List *L, int i)
     }
     if (ptr == NULL)
     {
-        printf("INDEX OUT OF RANGE !!!! \n");
+        printf("Error: Index out of range \n");
     }
     return ptr;
 }
 
 Cell *searchList(List *L, char *str)
 {
+    // On parcourt la liste jusqu'a trouver l'element
     List ptr = *L;
     while (ptr != NULL && strcmp(str, ptr->data) != 0)
     {
@@ -101,27 +109,30 @@ Cell *searchList(List *L, char *str)
 
 List *stol(char *s)
 {
-    int pos = 0;
-    int n_pos = 0;
-    int size = strlen(s);
-    int sep = "|";
+    int string_size = strlen(s);
+    int increment = 0;
+    int break_pos = 0;
+
     char *ptr;
-    char *result = malloc(sizeof(char) * 1000);
-    int end = 0;
+    char *cell_content = malloc(sizeof(char) * 1000);
     List *L = initList();
-    while (pos < strlen(s))
+
+    // On cherche la position de tous les | et on ajoute la chaine de characteres precedent
+    // au contenu de la cellule. On s'arrete lorsqu'on trouve \n (fin de chaine) et on ajoute
+    // la cellule a notre liste.
+    while (increment < string_size)
     {
-        ptr = strchr(s + pos, sep);
+        ptr = strchr(s + increment, "|");
         if (ptr == NULL)
-            n_pos = strlen(s) + 1;
+            break_pos = strlen(s) + 1;
         else
         {
-            n_pos = ptr - s + 1;
+            break_pos = ptr - s + 1;
         }
-        memcpy(result, s + pos, n_pos - pos - 1);
-        result[n_pos - pos - 1] = *"\0";
-        pos = n_pos;
-        insertFirst(L, buildCell(result));
+        memcpy(cell_content, s + increment, break_pos - increment - 1);
+        cell_content[break_pos - increment - 1] = *"\0";
+        increment = break_pos;
+        insertFirst(L, buildCell(cell_content));
     }
     return L;
 }
@@ -146,16 +157,19 @@ void ltof(List *L, char *path)
 
 List *filterList(List *L, char *pattern)
 {
-    List *filtered = initList();
+    List *filtered_list = initList();
+
+    // On parcourt notre liste: si l'element correspond au pattern, on le garde, sinon
+    // on le passe.
     for (Cell *ptr = *L; ptr != NULL; ptr = ptr->next)
     {
         char *c = strdup(ptr->data);
         c[strlen(pattern)] = *"\0";
         if (strcmp(c, pattern) == 0)
         {
-            insertFirst(filtered, buildCell(ptr->data));
+            insertFirst(filtered_list, buildCell(ptr->data));
         }
         free(c);
     }
-    return filtered;
+    return filtered_list;
 }
